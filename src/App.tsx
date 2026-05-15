@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend
 } from 'recharts';
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -74,9 +74,27 @@ interface Reading {
   }>;
 }
 
-type TabType = 'current' | 'history' | 'analysis';
+type TabType = 'current' | 'history' | 'analysis' | 'converter';
+
+interface AgricontrolConfig {
+  p2: string;
+  pmMin: string;
+  pmSec: string;
+  lnot: string;
+  d: string;
+}
 
 export default function App() {
+  const [agriConfig, setAgriConfig] = useState<AgricontrolConfig>(() => {
+    try {
+      const saved = localStorage.getItem('lux_agri_config');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Error loading agri config', e);
+    }
+    return { p2: '60', pmMin: '5', pmSec: '0', lnot: '2000', d: '10' };
+  });
+
   const [deviceStates, setDeviceStates] = useState<Record<DeviceId, DeviceState>>(() => {
     try {
       const saved = localStorage.getItem('lux_device_states');
@@ -133,6 +151,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lux_active_tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('lux_agri_config', JSON.stringify(agriConfig));
+  }, [agriConfig]);
 
   const handleValueChange = (id: DeviceId, value: string) => {
     setDeviceStates((prev) => ({
@@ -274,6 +296,58 @@ export default function App() {
     return analyzeTrend(analysisDevice, referenceSource);
   }, [readings, analysisDevice, referenceSource]);
 
+  const computedConverter = useMemo(() => {
+    const p2 = parseFloat(agriConfig.p2) || 0;
+    const pmMin = parseFloat(agriConfig.pmMin) || 0;
+    const pmSec = parseFloat(agriConfig.pmSec) || 0;
+    const pmTotal = pmMin + (pmSec / 60);
+    const lnot = parseFloat(agriConfig.lnot) || 0;
+    const d = parseFloat(agriConfig.d) || 0;
+
+    const limiteSommaSoglia = 10;
+    const intervalloMassimo = p2;
+
+    const maxLux = 100000;
+    const windows = [];
+
+    if (p2 > 0 && pmTotal > 0 && maxLux > lnot && p2 > pmTotal) {
+      const step = (maxLux - lnot) / 4;
+      for (let i = 0; i < 4; i++) {
+          const startLux = lnot + (i * step);
+          const endLux = i === 3 ? maxLux : startLux + step;
+          const midLux = (startLux + endLux) / 2;
+          
+          // Interpolazione lineare della pausa al centro della finestra (MidLux), la pausa decresce all'aumentare dei Lux
+          const targetPause = p2 - ((p2 - pmTotal) * ((midLux - lnot) / (maxLux - lnot)));
+          
+          // Frequenza in minuti = Pausa bersaglio divisa per il limite soglia (10)
+          const frequenza = targetPause / limiteSommaSoglia;
+
+          windows.push({
+              startLux: Math.round(startLux),
+              endLux: Math.round(endLux),
+              frequenza: Math.max(0.1, frequenza).toFixed(1), // minimo 0.1 min
+              targetPause: targetPause.toFixed(1)
+          });
+      }
+    }
+
+    // Status Calibrazione della Sonda basato su trendData corrente
+    let isSondaInvertita = false;
+    let anomalyMessage = '';
+    
+    if (trendData) {
+      if (trendData.slope < -0.1) {
+        isSondaInvertita = true;
+        anomalyMessage = 'ATTENZIONE: La sonda Agricontrol sembra fornire letture INVERTITE rispetto al riferimento globale (Lux scendono quando dovrebbero salire). Controllare collegamento fili.';
+      } else if (trendData.rSquared < 0.3 && trendData.points.length > 3) {
+        anomalyMessage = 'ATTENZIONE: I dati della sonda Agricontrol sono molto instabili rispetto al riferimento. La conversione potrebbe non essere accurata nei casi reali.';
+      }
+    }
+
+    return { windows, limiteSommaSoglia, intervalloMassimo, d, isSondaInvertita, anomalyMessage };
+  }, [agriConfig, trendData]);
+
   const formatLux = (val: number) => new Intl.NumberFormat('it-IT').format(Math.round(val));
 
   return (
@@ -410,24 +484,30 @@ export default function App() {
           <div className="lg:col-span-8 flex flex-col gap-6">
             
             {/* Tabs Navigation */}
-            <div className="bg-slate-200/50 p-1 rounded-xl flex items-center gap-1 text-sm font-medium">
+            <div className="bg-slate-200/50 p-1 rounded-xl flex flex-wrap items-center gap-1 text-sm font-medium">
               <button 
                 onClick={() => setActiveTab('current')} 
-                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all", activeTab === 'current' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all min-w-[120px]", activeTab === 'current' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
               >
                 <LayoutDashboard className="w-4 h-4" /> Istantanea
               </button>
               <button 
                 onClick={() => setActiveTab('history')} 
-                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all", activeTab === 'history' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all min-w-[120px]", activeTab === 'history' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
               >
                 <History className="w-4 h-4" /> Storico <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-xs ml-1">{readings.length}</span>
               </button>
               <button 
                 onClick={() => setActiveTab('analysis')} 
-                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all", activeTab === 'analysis' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all min-w-[120px]", activeTab === 'analysis' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
               >
                 <TrendingUp className="w-4 h-4" /> Analisi
+              </button>
+              <button 
+                onClick={() => setActiveTab('converter')} 
+                className={cn("flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all min-w-[120px]", activeTab === 'converter' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+              >
+                <ArrowRightLeft className="w-4 h-4" /> Conversione Program.
               </button>
             </div>
 
@@ -792,6 +872,142 @@ export default function App() {
                     </div>
                   ) : null}
 
+                </div>
+              </motion.div>
+            )}
+
+            {/* TAB CONTENT: CONVERTER */}
+            {activeTab === 'converter' && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                
+                {computedConverter.anomalyMessage && (
+                  <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl flex items-start gap-3 shadow-sm">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <p className="text-sm font-medium">{computedConverter.anomalyMessage}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {/* Left: Agricontrol Input */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
+                    <div>
+                      <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                        <ArrowRightLeft className="w-5 h-5 text-indigo-500" />
+                        Programmazione Agricontrol
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Inserisci i parametri attuali della centralina (Agrineb/Fog).
+                      </p>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">P2 (Pausa Massima)</label>
+                        <div className="relative">
+                          <input type="number" value={agriConfig.p2} onChange={e => setAgriConfig({...agriConfig, p2: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">min</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">PM (Pausa Minima)</label>
+                          <div className="relative">
+                            <input type="number" value={agriConfig.pmMin} onChange={e => setAgriConfig({...agriConfig, pmMin: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">min</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">&nbsp;</label>
+                          <div className="relative">
+                            <input type="number" value={agriConfig.pmSec} onChange={e => setAgriConfig({...agriConfig, pmSec: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">sec</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">L.not (Soglia Inizio Notte)</label>
+                        <div className="relative">
+                          <input type="number" value={agriConfig.lnot} onChange={e => setAgriConfig({...agriConfig, lnot: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Lux</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">d (Durata bagnatura)</label>
+                        <div className="relative">
+                          <input type="number" value={agriConfig.d} onChange={e => setAgriConfig({...agriConfig, d: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">sec</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: OmniGreen Output */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
+                    <div>
+                      <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        Configurazione OmniGreen
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Copia questi valori nella "Regola Impianto".
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
+                        <span className="text-sm font-medium text-slate-600">Intervallo massimo somma soglia:</span>
+                        <span className="font-mono font-semibold text-slate-900">{computedConverter.intervalloMassimo} min</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
+                        <span className="text-sm font-medium text-slate-600">Limite somma soglia:</span>
+                        <span className="font-mono font-semibold text-slate-900">{computedConverter.limiteSommaSoglia}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-4">
+                        <span className="text-sm font-medium text-slate-600">Durata Azione (Apri stazione):</span>
+                        <span className="font-mono font-semibold text-slate-900">{computedConverter.d} sec</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-700 mb-3">Tabella Finestre (Punti/Frequenza)</h4>
+                      <div className="overflow-hidden border border-slate-200 rounded-xl">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-3 py-2 font-medium text-slate-600">Da (Lux)</th>
+                              <th className="px-3 py-2 font-medium text-slate-600">A (Lux)</th>
+                              <th className="px-3 py-2 text-right font-medium text-slate-600 border-l border-slate-200" title="Target pausa derivata">Pausa</th>
+                              <th className="px-3 py-2 text-right font-medium text-indigo-700 font-semibold bg-indigo-50/50">+1 Punto (Freq)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {computedConverter.windows.length === 0 ? (
+                              <tr><td colSpan={4} className="px-3 py-4 text-center text-slate-500 bg-slate-50/50 italic">Compila tutti i campi correttamente per calcolare le finestre. (Assicurati che P2 sia maggiore di PM)</td></tr>
+                            ) : computedConverter.windows.map((w, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.startLux)}</td>
+                                <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.endLux)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-slate-400 border-l border-slate-100">{w.targetPause}m</td>
+                                <td className="px-3 py-2 text-right font-mono font-semibold text-indigo-700 bg-indigo-50/30">
+                                  {w.frequenza} min
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-500 bg-blue-50 border border-blue-100 p-3 rounded-xl flex flex-col gap-2 mt-auto">
+                      <p className="font-medium text-blue-800 flex items-center gap-1.5"><Info className="w-3.5 h-3.5"/> Note Informative</p>
+                      <p className="leading-relaxed">• L'<b>Intervallo massimo</b> garantisce l'irrigazione di sicurezza anche quando rimane poca luce (ma superiore alla soglia L.not).</p>
+                      <p className="leading-relaxed">• Se i Lux scendono sotto la soglia <b>L.not</b> impostata, la regola base si ferma (ed entra in gioco l'eventuale programmazione notturna separata).</p>
+                    </div>
+
+                  </div>
                 </div>
               </motion.div>
             )}
