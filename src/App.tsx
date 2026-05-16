@@ -83,6 +83,7 @@ interface AgricontrolConfig {
   pmSec: string;
   lnot: string;
   d: string;
+  numWindows?: string;
 }
 
 export default function App() {
@@ -93,7 +94,7 @@ export default function App() {
     } catch (e) {
       console.error('Error loading agri config', e);
     }
-    return { p2: '60', pmMin: '5', pmSec: '0', lnot: '2000', d: '10' };
+    return { p2: '60', pmMin: '5', pmSec: '0', lnot: '2000', d: '10', numWindows: '4' };
   });
 
   const [calcInput, setCalcInput] = useState<string>('');
@@ -315,6 +316,7 @@ export default function App() {
     const pmTotal = pmMin + (pmSec / 60);
     const lnot = parseFloat(agriConfig.lnot) || 0;
     const d = parseFloat(agriConfig.d) || 0;
+    const numWindows = parseInt(agriConfig.numWindows || '4', 10);
 
     const limiteSommaSoglia = 10;
     const intervalloMassimo = p2;
@@ -322,16 +324,16 @@ export default function App() {
     const maxLux = 100000;
     const windows = [];
 
-    if (p2 > 0 && pmTotal > 0 && maxLux > lnot && p2 > pmTotal) {
-      const step = (maxLux - lnot) / 4;
-      for (let i = 0; i < 4; i++) {
+    if (p2 > 0 && pmTotal > 0 && maxLux > lnot && p2 > pmTotal && numWindows > 1) {
+      const step = (maxLux - lnot) / numWindows;
+      for (let i = 0; i < numWindows; i++) {
           const startLux = lnot + (i * step);
-          const endLux = i === 3 ? maxLux : startLux + step;
+          const endLux = i === numWindows - 1 ? maxLux : startLux + step;
           const midLux = (startLux + endLux) / 2;
           
           // Ora assegniamo esattamente P2 alla prima finestra e PM all'ultima, distribuendo in modo lineare i gradini.
           // In precedenza calcolavamo il punto medio dei Lux (midLux), il cui valore si avvicinava senza mai toccare gli estremi assoluti P2 e PM.
-          const targetPause = p2 - ((p2 - pmTotal) * (i / 3));
+          const targetPause = p2 - ((p2 - pmTotal) * (i / (numWindows - 1)));
           
           // Frequenza in minuti = Pausa bersaglio divisa per il limite soglia (10)
           const frequenza = targetPause / limiteSommaSoglia;
@@ -1015,6 +1017,13 @@ export default function App() {
                         <div className="relative">
                           <input type="number" value={agriConfig.d} onChange={e => setAgriConfig({...agriConfig, d: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">sec</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Numero di Finestre</label>
+                        <div className="relative">
+                          <input type="number" value={agriConfig.numWindows || '4'} onChange={e => setAgriConfig({...agriConfig, numWindows: e.target.value})} min="2" max="20" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                         </div>
                       </div>
                     </div>
