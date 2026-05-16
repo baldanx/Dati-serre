@@ -1054,7 +1054,7 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-6">
                   {/* Left: Agricontrol Input */}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
                     <div>
@@ -1067,34 +1067,34 @@ export default function App() {
                       </p>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">P2 (Pausa Massima)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">P2 (Pausa Max)</label>
                         <div className="relative">
                           <input type="number" value={agriConfig.p2} onChange={e => setAgriConfig({...agriConfig, p2: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">min</span>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">PM (Pausa Minima)</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">PM (Min)</label>
                           <div className="relative">
                             <input type="number" value={agriConfig.pmMin} onChange={e => setAgriConfig({...agriConfig, pmMin: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">min</span>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">m</span>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">&nbsp;</label>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">PM (Sec)</label>
                           <div className="relative">
                             <input type="number" value={agriConfig.pmSec} onChange={e => setAgriConfig({...agriConfig, pmSec: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">sec</span>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">s</span>
                           </div>
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">L.not (Soglia Inizio Notte)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">L.not (Soglia)</label>
                         <div className="relative">
                           <input type="number" value={agriConfig.lnot} onChange={e => setAgriConfig({...agriConfig, lnot: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Lux</span>
@@ -1102,7 +1102,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">d (Durata bagnatura)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">d (Bagnatura)</label>
                         <div className="relative">
                           <input type="number" value={agriConfig.d} onChange={e => setAgriConfig({...agriConfig, d: e.target.value})} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">sec</span>
@@ -1110,7 +1110,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Numero di Finestre</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5 whitespace-nowrap">N° Finestre</label>
                         <div className="relative">
                           <input type="number" value={agriConfig.numWindows || '4'} onChange={e => setAgriConfig({...agriConfig, numWindows: e.target.value})} min="2" max="20" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
                         </div>
@@ -1130,26 +1130,26 @@ export default function App() {
                       </p>
                     </div>
 
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-4">
-                      <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
-                        <span className="text-sm font-medium text-slate-600">Intervallo massimo somma soglia:</span>
-                        <span className="font-mono font-semibold text-slate-900">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1">
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Intervallo massimo somma soglia</span>
+                        <span className="text-lg font-mono font-semibold text-slate-900">
                           {Math.floor(computedConverter.intervalloMassimo)}m {Math.round((computedConverter.intervalloMassimo - Math.floor(computedConverter.intervalloMassimo)) * 60).toString().padStart(2, '0')}s
                         </span>
                       </div>
-                      <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
-                        <span className="text-sm font-medium text-slate-600">Limite somma soglia:</span>
-                        <span className="font-mono font-semibold text-slate-900">{computedConverter.limiteSommaSoglia}</span>
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1">
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Limite somma soglia</span>
+                        <span className="text-lg font-mono font-semibold text-slate-900">{computedConverter.limiteSommaSoglia}</span>
                       </div>
-                      <div className="flex justify-between items-center gap-4">
-                        <span className="text-sm font-medium text-slate-600">Durata Azione (Apri stazione):</span>
-                        <span className="font-mono font-semibold text-slate-900">{computedConverter.d} sec</span>
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1">
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Durata Azione (Apri stazione)</span>
+                        <span className="text-lg font-mono font-semibold text-slate-900">{computedConverter.d} sec</span>
                       </div>
                     </div>
 
                     <div>
                       <h4 className="text-sm font-semibold text-slate-700 mb-3">Tabella Finestre (Punti/Frequenza)</h4>
-                      <div className="overflow-hidden border border-slate-200 rounded-xl">
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
                         <table className="w-full text-xs text-left">
                           <thead className="bg-slate-50">
                             <tr>
