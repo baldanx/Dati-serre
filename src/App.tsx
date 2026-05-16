@@ -368,17 +368,20 @@ export default function App() {
     const agrinebToOmniTrend = analyzeTrend('omnigreen', 'agrineb');
 
     if (p2 > 0 && pmTotal > 0 && maxLux > lnot && p2 > pmTotal && numWindows > 1) {
-      const step = (maxLux - lnot) / numWindows;
+      const step = (maxLux - lnot) / (numWindows - 1);
       for (let i = 0; i < numWindows; i++) {
           const startLuxAgrineb = lnot + (i * step);
-          const endLuxAgrineb = i === numWindows - 1 ? maxLux : startLuxAgrineb + step;
+          const isLastWindow = i === numWindows - 1;
+          const endLuxAgrineb = isLastWindow ? Infinity : startLuxAgrineb + step;
           
           let startLux = startLuxAgrineb;
           let endLux = endLuxAgrineb;
           
           if (agrinebToOmniTrend && agrinebToOmniTrend.points.length > 1) {
               startLux = (startLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
-              endLux = (endLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+              if (!isLastWindow) {
+                  endLux = (endLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+              }
           }
 
           const targetPause = p2 - ((p2 - pmTotal) * (i / (numWindows - 1)));
@@ -427,7 +430,10 @@ export default function App() {
     return { windows, limiteSommaSoglia, intervalloMassimo, d, isSondaInvertita, anomalyMessage };
   }, [agriConfig, trendData, readings]);
 
-  const formatLux = (val: number) => new Intl.NumberFormat('it-IT').format(Math.round(val));
+  const formatLux = (val: number) => {
+    if (val === Infinity) return "Infinito";
+    return new Intl.NumberFormat('it-IT').format(Math.round(val));
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8 selection:bg-indigo-100 pb-24">
