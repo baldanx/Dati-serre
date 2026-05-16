@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend
 } from 'recharts';
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -63,6 +63,7 @@ const DEVICES: DeviceConfig[] = [
 interface DeviceState {
   rawValue: string;
   dotActive: boolean;
+  isActive?: boolean;
 }
 
 interface Reading {
@@ -173,6 +174,13 @@ export default function App() {
     }));
   };
 
+  const handleToggleActive = (id: DeviceId) => {
+    setDeviceStates((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], isActive: prev[id].isActive === false ? true : false },
+    }));
+  };
+
   const computedCurrentData = useMemo(() => {
     return DEVICES.map((device) => {
       const state = deviceStates[device.id];
@@ -197,6 +205,7 @@ export default function App() {
       return {
         ...device,
         state,
+        isActive: state.isActive !== false,
         parsedValue: isInvalid ? 0 : parsedValue,
         multiplier,
         totalLux,
@@ -237,7 +246,7 @@ export default function App() {
 
   const currentRefLux = computedCurrentData.find((d) => d.id === referenceSource)?.totalLux || 0;
 
-  const comparisonData = computedCurrentData.map((d) => {
+  const comparisonData = computedCurrentData.filter(d => d.isActive).map((d) => {
     let diffPercent = 0;
     if (currentRefLux > 0) {
       diffPercent = ((d.totalLux - currentRefLux) / currentRefLux) * 100;
@@ -377,7 +386,7 @@ export default function App() {
                   onChange={(e) => setReferenceSource(e.target.value as DeviceId)}
                   className="appearance-none bg-indigo-50 border-none rounded-lg pl-3 pr-8 py-1.5 text-sm font-semibold text-indigo-700 outline-none hover:bg-indigo-100 transition-colors cursor-pointer"
                 >
-                  {DEVICES.map(d => (
+                  {DEVICES.filter(d => deviceStates[d.id].isActive !== false).map(d => (
                     <option key={d.id} value={d.id}>{d.name.split(' ')[0]} {d.name.split(' ').length > 1 ? d.name.split(' ')[1] : ''}</option>
                   ))}
                 </select>
@@ -401,10 +410,12 @@ export default function App() {
                   const overRange = computedCurrentData.find((d) => d.id === device.id)?.isOverRange;
                   const currentLux = computedCurrentData.find((d) => d.id === device.id)?.totalLux;
                   const isRef = device.id === referenceSource;
+                  const isActive = state.isActive !== false;
 
                   return (
                     <div key={device.id} className={cn("p-4 rounded-xl border transition-colors", 
-                      isRef ? "bg-indigo-50/50 border-indigo-100" : "bg-white border-slate-100"
+                      !isActive ? "bg-slate-50/50 border-slate-100 opacity-60" :
+                      (isRef ? "bg-indigo-50/50 border-indigo-100" : "bg-white border-slate-100")
                     )}>
                       <div className="flex justify-between items-start mb-3">
                         <label className="font-medium text-sm text-slate-700 flex flex-col gap-0.5" htmlFor={`input-${device.id}`}>
@@ -412,13 +423,21 @@ export default function App() {
                             {isRef && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
                             {device.name}
                           </span>
-                          {currentLux !== undefined && !isNaN(currentLux) && currentLux > 0 && (
+                          {currentLux !== undefined && !isNaN(currentLux) && currentLux > 0 && isActive && (
                             <span className="text-xs font-mono text-slate-500">= {formatLux(currentLux)} Lux</span>
                           )}
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(device.id)}
+                          className={cn("p-1.5 rounded-md transition-colors", isActive ? "text-indigo-600 hover:bg-indigo-50 bg-indigo-50/50" : "text-slate-400 hover:bg-slate-200 bg-slate-100")}
+                          title={isActive ? 'Disattiva sensore' : 'Attiva sensore'}
+                        >
+                          {isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        </button>
                       </div>
                       
-                      <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                      <div className={cn("flex flex-col xl:flex-row xl:items-center gap-3 transition-opacity", !isActive && "pointer-events-none")}>
                         <div className="relative flex-1">
                           <input
                             id={`input-${device.id}`}
@@ -650,7 +669,7 @@ export default function App() {
                             formatter={(value: number, name: string) => [formatLux(value) + ' Lux', DEVICES.find(d=>d.id===name)?.name.split(' ')[0]]}
                           />
                           <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', marginTop: '10px' }} />
-                          {DEVICES.map(device => (
+                          {DEVICES.filter(d => deviceStates[d.id].isActive !== false).map(device => (
                             <Line 
                               key={device.id}
                               type="monotone"
@@ -674,7 +693,7 @@ export default function App() {
                       <thead>
                         <tr className="border-b border-slate-100 text-slate-500">
                           <th className="px-6 py-4 font-medium">Ora</th>
-                          {DEVICES.map(d => (
+                          {DEVICES.filter(d => deviceStates[d.id].isActive !== false).map(d => (
                             <th key={d.id} className="px-6 py-4 text-right font-medium">
                               {d.name.split(' ')[0]} 
                               {d.id === referenceSource && <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] ml-1 uppercase">Rif</span>}
@@ -689,7 +708,7 @@ export default function App() {
                             <td className="px-6 py-3 font-medium text-slate-700">
                               {new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </td>
-                            {DEVICES.map(d => {
+                            {DEVICES.filter(d => deviceStates[d.id].isActive !== false).map(d => {
                               const val = r.data[d.id]?.totalLux;
                               const isRef = d.id === referenceSource;
                               const refVal = r.data[referenceSource]?.totalLux;
@@ -763,7 +782,7 @@ export default function App() {
                         onChange={(e) => setAnalysisDevice(e.target.value as DeviceId)}
                         className="bg-white border border-slate-200 rounded px-2 py-1 text-sm font-medium outline-none"
                       >
-                        {DEVICES.filter(d => d.id !== referenceSource).map(d => (
+                        {DEVICES.filter(d => d.id !== referenceSource && deviceStates[d.id].isActive !== false).map(d => (
                           <option key={d.id} value={d.id}>{d.name.split(' ')[0]}</option>
                         ))}
                       </select>
