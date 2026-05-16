@@ -338,11 +338,20 @@ export default function App() {
           // Frequenza in minuti = Pausa bersaglio divisa per il limite soglia (10)
           const frequenza = targetPause / limiteSommaSoglia;
 
+          const formatMinSec = (decimalMinutes: number) => {
+            const m = Math.floor(decimalMinutes);
+            const s = Math.round((decimalMinutes - m) * 60);
+            if (s === 60) return `${m + 1}m 00s`;
+            return `${m}m ${s.toString().padStart(2, '0')}s`;
+          };
+
           windows.push({
               startLux: Math.round(startLux),
               endLux: Math.round(endLux),
-              frequenza: Math.max(0.1, frequenza).toFixed(1), // minimo 0.1 min
-              targetPause: targetPause.toFixed(1)
+              frequenza: Math.max(0.1, frequenza),
+              frequenzaFormatted: formatMinSec(Math.max(0.1, frequenza)),
+              targetPause: targetPause,
+              targetPauseFormatted: formatMinSec(targetPause)
           });
       }
     }
@@ -1044,7 +1053,9 @@ export default function App() {
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-4">
                       <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
                         <span className="text-sm font-medium text-slate-600">Intervallo massimo somma soglia:</span>
-                        <span className="font-mono font-semibold text-slate-900">{computedConverter.intervalloMassimo} min</span>
+                        <span className="font-mono font-semibold text-slate-900">
+                          {Math.floor(computedConverter.intervalloMassimo)}m {Math.round((computedConverter.intervalloMassimo - Math.floor(computedConverter.intervalloMassimo)) * 60).toString().padStart(2, '0')}s
+                        </span>
                       </div>
                       <div className="flex justify-between items-center pb-3 border-b border-slate-200 gap-4">
                         <span className="text-sm font-medium text-slate-600">Limite somma soglia:</span>
@@ -1075,9 +1086,9 @@ export default function App() {
                               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.startLux)}</td>
                                 <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.endLux)}</td>
-                                <td className="px-3 py-2 text-right font-mono text-slate-400 border-l border-slate-100">{w.targetPause}m</td>
+                                <td className="px-3 py-2 text-right font-mono text-slate-400 border-l border-slate-100">{w.targetPauseFormatted}</td>
                                 <td className="px-3 py-2 text-right font-mono font-semibold text-indigo-700 bg-indigo-50/30">
-                                  {w.frequenza} min
+                                  {w.frequenzaFormatted}
                                 </td>
                               </tr>
                             ))}
