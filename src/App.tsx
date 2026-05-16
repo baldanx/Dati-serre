@@ -84,6 +84,7 @@ interface AgricontrolConfig {
   lnot: string;
   d: string;
   numWindows?: string;
+  limiteSommaSoglia?: string;
 }
 
 export default function App() {
@@ -357,8 +358,8 @@ export default function App() {
     const lnot = parseFloat(agriConfig.lnot) || 0;
     const d = parseFloat(agriConfig.d) || 0;
     const numWindows = parseInt(agriConfig.numWindows || '4', 10);
+    const limiteSommaSoglia = parseFloat(agriConfig.limiteSommaSoglia || '10') || 10;
 
-    const limiteSommaSoglia = 10;
     const intervalloMassimo = p2;
 
     const maxLux = 100000;
@@ -1143,9 +1144,14 @@ export default function App() {
                           {Math.floor(computedConverter.intervalloMassimo)}m {Math.round((computedConverter.intervalloMassimo - Math.floor(computedConverter.intervalloMassimo)) * 60).toString().padStart(2, '0')}s
                         </span>
                       </div>
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1">
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1 group">
                         <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Limite somma soglia</span>
-                        <span className="text-lg font-mono font-semibold text-slate-900">{computedConverter.limiteSommaSoglia}</span>
+                        <input 
+                           type="number" 
+                           value={agriConfig.limiteSommaSoglia || '10'} 
+                           onChange={e => setAgriConfig({...agriConfig, limiteSommaSoglia: e.target.value})}
+                           className="w-full text-lg font-mono font-semibold text-slate-900 bg-transparent border-b border-transparent focus:border-indigo-300 group-hover:border-slate-300 outline-none transition-colors -ml-1 pl-1"
+                        />
                       </div>
                       <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-start justify-center gap-1">
                         <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Durata Azione (Apri stazione)</span>
