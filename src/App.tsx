@@ -95,6 +95,9 @@ export default function App() {
     return { p2: '60', pmMin: '5', pmSec: '0', lnot: '2000', d: '10' };
   });
 
+  const [calcInput, setCalcInput] = useState<string>('');
+  const [calcDirection, setCalcDirection] = useState<'toRef' | 'toDev'>('toRef');
+
   const [deviceStates, setDeviceStates] = useState<Record<DeviceId, DeviceState>>(() => {
     try {
       const saved = localStorage.getItem('lux_device_states');
@@ -872,6 +875,59 @@ export default function App() {
                       </div>
                     </div>
                   ) : null}
+
+                  {trendData && (
+                    <div className="mt-8 border-t border-slate-200 pt-8">
+                      <h4 className="flex items-center gap-2 font-semibold text-slate-800 mb-4">
+                        <ArrowRightLeft className="w-5 h-5 text-indigo-500" />
+                        Calcolatore di Conversione Lux (basato sul trend calcolato)
+                      </h4>
+                      <div className="flex flex-col md:flex-row gap-6 items-start rounded-xl p-6 bg-slate-50 border border-slate-100">
+                        <div className="flex-1 w-full space-y-4">
+                           <div className="flex flex-wrap bg-white rounded-lg p-1 border border-slate-200 shadow-sm w-max gap-1">
+                             <button onClick={() => setCalcDirection('toRef')} className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", calcDirection === 'toRef' ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:text-slate-700")}>
+                               Da {DEVICES.find(d => d.id === analysisDevice)?.name.split(' ')[0]} a Riferimento
+                             </button>
+                             <button onClick={() => setCalcDirection('toDev')} className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", calcDirection === 'toDev' ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:text-slate-700")}>
+                               Da Riferimento a {DEVICES.find(d => d.id === analysisDevice)?.name.split(' ')[0]}
+                             </button>
+                           </div>
+
+                           <div>
+                             <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                               {calcDirection === 'toRef' 
+                                 ? `Se il sensore ${DEVICES.find(d => d.id === analysisDevice)?.name.split(' ')[0]} legge:`
+                                 : `Se il riferimento (${DEVICES.find(d => d.id === referenceSource)?.name.split(' ')[0]}) legge:`
+                               }
+                             </label>
+                             <div className="relative max-w-xs">
+                               <input 
+                                 type="number"
+                                 value={calcInput}
+                                 onChange={(e) => setCalcInput(e.target.value)}
+                                 placeholder="Es. 10000"
+                                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                               />
+                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Lux</span>
+                             </div>
+                           </div>
+                        </div>
+
+                        <div className="md:w-64 w-full bg-white rounded-xl border border-slate-200 p-5 shadow-sm text-center">
+                          <p className="text-sm text-slate-500 mb-2">
+                            Il valore {calcDirection === 'toRef' ? 'reale' : 'del sensore'} corrisponde a:
+                          </p>
+                          <div className={cn("text-3xl font-mono font-semibold", calcInput && !isNaN(parseFloat(calcInput)) ? "text-indigo-700" : "text-slate-300")}>
+                            {calcInput && !isNaN(parseFloat(calcInput)) ? (
+                              calcDirection === 'toRef' 
+                                ? formatLux((parseFloat(calcInput) - trendData.intercept) / trendData.slope)
+                                : formatLux((parseFloat(calcInput) * trendData.slope) + trendData.intercept)
+                            ) : '0'} <span className="text-lg text-slate-400 font-sans">Lux</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 </div>
               </motion.div>
