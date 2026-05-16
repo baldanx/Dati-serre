@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend
 } from 'recharts';
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff, Download, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff, Download, Upload, Copy } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -1184,8 +1184,32 @@ export default function App() {
                               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-3 py-2 font-mono text-slate-500">{formatLux(w.startLuxAgrineb)}</td>
                                 <td className="px-3 py-2 font-mono text-slate-500 border-r border-slate-100">{formatLux(w.endLuxAgrineb)}</td>
-                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10">{formatLux(w.startLux)}</td>
-                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10">{formatLux(w.endLux)}</td>
+                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10 group/cell">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{formatLux(w.startLux)}</span>
+                                    <button 
+                                      onClick={() => navigator.clipboard.writeText(Math.round(w.startLux).toString())}
+                                      className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-indigo-100 rounded text-indigo-500 transition-opacity"
+                                      title="Copia valore"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10 group/cell">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{formatLux(w.endLux)}</span>
+                                    {w.endLux !== Infinity && (
+                                      <button 
+                                        onClick={() => navigator.clipboard.writeText(Math.round(w.endLux).toString())}
+                                        className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-indigo-100 rounded text-indigo-500 transition-opacity"
+                                        title="Copia valore"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="px-3 py-2 text-right font-mono text-slate-400 border-l border-slate-100">{w.targetPauseFormatted}</td>
                                 <td className="px-3 py-2 text-right font-mono font-semibold text-indigo-700 bg-indigo-50/30">
                                   {w.frequenzaFormatted}
