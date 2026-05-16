@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend
 } from 'recharts';
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff, Download, Upload } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -243,6 +243,46 @@ export default function App() {
     if (confirm('Sei sicuro di voler cancellare tutte le letture?')) {
       setReadings([]);
     }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const exportReadings = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(readings));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `lux_readings_export_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchorNode); 
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target?.result as string);
+          if (Array.isArray(json)) {
+            // Uniamo le letture, evitando duplicati per ID
+            setReadings((prev) => {
+              const existingIds = new Set(prev.map(r => r.id));
+              const newReadings = json.filter(r => r.id && !existingIds.has(r.id));
+              return [...prev, ...newReadings].sort((a, b) => a.timestamp - b.timestamp);
+            });
+            alert(`Importate ${json.length} letture con successo.`);
+          } else {
+            alert('Formato file non valido. Deve essere un array di letture JSON.');
+          }
+        } catch (err) {
+          console.error("Invalid JSON file", err);
+          alert("Errore durante l'importazione del file JSON.");
+        }
+      };
+      reader.readAsText(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const currentRefLux = computedCurrentData.find((d) => d.id === referenceSource)?.totalLux || 0;
@@ -660,15 +700,40 @@ export default function App() {
                       <TrendingUp className="w-5 h-5 text-indigo-500" />
                       Andamento nel Tempo
                     </h3>
-                    {readings.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        ref={fileInputRef} 
+                        onChange={handleImportFiles} 
+                        className="hidden" 
+                      />
                       <button 
-                        onClick={clearAllReadings}
-                        className="text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border border-rose-100"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Svuota Storico
+                        <Upload className="w-3.5 h-3.5" />
+                        Importa
                       </button>
-                    )}
+                      {readings.length > 0 && (
+                        <>
+                          <button 
+                            onClick={exportReadings}
+                            className="text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Esporta
+                          </button>
+                          <button 
+                            onClick={clearAllReadings}
+                            className="text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border border-rose-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Svuota
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {readings.length === 0 ? (
                     <div className="h-[280px] flex items-center justify-center text-slate-400 flex-col gap-2">
