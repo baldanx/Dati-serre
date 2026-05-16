@@ -323,16 +323,24 @@ export default function App() {
 
     const maxLux = 100000;
     const windows = [];
+    
+    // Convertiamo le finestre da agrineb a omnigreen
+    const agrinebToOmniTrend = analyzeTrend('omnigreen', 'agrineb');
 
     if (p2 > 0 && pmTotal > 0 && maxLux > lnot && p2 > pmTotal && numWindows > 1) {
       const step = (maxLux - lnot) / numWindows;
       for (let i = 0; i < numWindows; i++) {
-          const startLux = lnot + (i * step);
-          const endLux = i === numWindows - 1 ? maxLux : startLux + step;
-          const midLux = (startLux + endLux) / 2;
+          const startLuxAgrineb = lnot + (i * step);
+          const endLuxAgrineb = i === numWindows - 1 ? maxLux : startLuxAgrineb + step;
           
-          // Ora assegniamo esattamente P2 alla prima finestra e PM all'ultima, distribuendo in modo lineare i gradini.
-          // In precedenza calcolavamo il punto medio dei Lux (midLux), il cui valore si avvicinava senza mai toccare gli estremi assoluti P2 e PM.
+          let startLux = startLuxAgrineb;
+          let endLux = endLuxAgrineb;
+          
+          if (agrinebToOmniTrend && agrinebToOmniTrend.points.length > 1) {
+              startLux = (startLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+              endLux = (endLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+          }
+
           const targetPause = p2 - ((p2 - pmTotal) * (i / (numWindows - 1)));
           
           // Frequenza in minuti = Pausa bersaglio divisa per il limite soglia (10)
@@ -346,6 +354,8 @@ export default function App() {
           };
 
           windows.push({
+              startLuxAgrineb: Math.round(startLuxAgrineb),
+              endLuxAgrineb: Math.round(endLuxAgrineb),
               startLux: Math.round(startLux),
               endLux: Math.round(endLux),
               frequenza: Math.max(0.1, frequenza),
@@ -369,8 +379,13 @@ export default function App() {
       }
     }
 
+    // Aggiungo messaggio anomalia conversione
+    if (!agrinebToOmniTrend || agrinebToOmniTrend.points.length < 2) {
+      anomalyMessage = 'Attenzione: dati storici insufficienti per convertire da Agrineb a Omnigreen. La tabella mostra valori stimati (1:1). Inserisci più misurazioni nel cruscotto.';
+    }
+
     return { windows, limiteSommaSoglia, intervalloMassimo, d, isSondaInvertita, anomalyMessage };
-  }, [agriConfig, trendData]);
+  }, [agriConfig, trendData, readings]);
 
   const formatLux = (val: number) => new Intl.NumberFormat('it-IT').format(Math.round(val));
 
@@ -1073,19 +1088,27 @@ export default function App() {
                         <table className="w-full text-xs text-left">
                           <thead className="bg-slate-50">
                             <tr>
-                              <th className="px-3 py-2 font-medium text-slate-600">Da (Lux)</th>
-                              <th className="px-3 py-2 font-medium text-slate-600">A (Lux)</th>
-                              <th className="px-3 py-2 text-right font-medium text-slate-600 border-l border-slate-200" title="Target pausa derivata">Pausa</th>
-                              <th className="px-3 py-2 text-right font-medium text-indigo-700 font-semibold bg-indigo-50/50">+1 Punto (Freq)</th>
+                              <th className="px-3 py-2 font-medium text-slate-600 border-b-2 border-slate-200" colSpan={2}>Riferimento (Agrineb)</th>
+                              <th className="px-3 py-2 font-medium text-indigo-700 bg-indigo-50/50 border-b-2 border-indigo-100" colSpan={2}>Convertito (Omnigreen)</th>
+                              <th className="px-3 py-2 text-right font-medium text-slate-600 border-l border-slate-200 border-b-2 border-slate-200" title="Target pausa derivata" rowSpan={2}>Pausa</th>
+                              <th className="px-3 py-2 text-right font-medium text-indigo-700 font-semibold bg-indigo-50/50 border-b-2 border-indigo-100" rowSpan={2}>+1 Punto (Freq)</th>
+                            </tr>
+                            <tr>
+                              <th className="px-3 py-1 font-medium text-slate-500">Da (Lux)</th>
+                              <th className="px-3 py-1 font-medium text-slate-500 border-r border-slate-200">A (Lux)</th>
+                              <th className="px-3 py-1 font-medium text-indigo-600 bg-indigo-50/50">Da (Lux)</th>
+                              <th className="px-3 py-1 font-medium text-indigo-600 bg-indigo-50/50">A (Lux)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 bg-white">
                             {computedConverter.windows.length === 0 ? (
-                              <tr><td colSpan={4} className="px-3 py-4 text-center text-slate-500 bg-slate-50/50 italic">Compila tutti i campi correttamente per calcolare le finestre. (Assicurati che P2 sia maggiore di PM)</td></tr>
+                              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-500 bg-slate-50/50 italic">Compila tutti i campi correttamente per calcolare le finestre. (Assicurati che P2 sia maggiore di PM)</td></tr>
                             ) : computedConverter.windows.map((w, idx) => (
                               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.startLux)}</td>
-                                <td className="px-3 py-2 font-mono text-slate-600">{formatLux(w.endLux)}</td>
+                                <td className="px-3 py-2 font-mono text-slate-500">{formatLux(w.startLuxAgrineb)}</td>
+                                <td className="px-3 py-2 font-mono text-slate-500 border-r border-slate-100">{formatLux(w.endLuxAgrineb)}</td>
+                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10">{formatLux(w.startLux)}</td>
+                                <td className="px-3 py-2 font-mono font-semibold text-indigo-600 bg-indigo-50/10">{formatLux(w.endLux)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-slate-400 border-l border-slate-100">{w.targetPauseFormatted}</td>
                                 <td className="px-3 py-2 text-right font-mono font-semibold text-indigo-700 bg-indigo-50/30">
                                   {w.frequenzaFormatted}
