@@ -317,8 +317,9 @@ export default function App() {
           const endLux = i === 3 ? maxLux : startLux + step;
           const midLux = (startLux + endLux) / 2;
           
-          // Interpolazione lineare della pausa al centro della finestra (MidLux), la pausa decresce all'aumentare dei Lux
-          const targetPause = p2 - ((p2 - pmTotal) * ((midLux - lnot) / (maxLux - lnot)));
+          // Ora assegniamo esattamente P2 alla prima finestra e PM all'ultima, distribuendo in modo lineare i gradini.
+          // In precedenza calcolavamo il punto medio dei Lux (midLux), il cui valore si avvicinava senza mai toccare gli estremi assoluti P2 e PM.
+          const targetPause = p2 - ((p2 - pmTotal) * (i / 3));
           
           // Frequenza in minuti = Pausa bersaglio divisa per il limite soglia (10)
           const frequenza = targetPause / limiteSommaSoglia;
