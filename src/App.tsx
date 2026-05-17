@@ -301,21 +301,21 @@ export default function App() {
 
   // --- ANALYSIS LOGIC ---
   const analyzeTrend = (devId: DeviceId, refId: DeviceId) => {
-    const points = readings
+    const rawPoints = readings
       .map(r => ({
         x: r.data[refId].totalLux, // reference x
         y: r.data[devId].totalLux  // device y
       }))
       .filter(p => !isNaN(p.x) && !isNaN(p.y) && p.x > 0 && p.y > 0);
 
-    if (points.length < 2) return null;
+    if (rawPoints.length < 2) return null;
 
-    const n = points.length;
-    const sumX = points.reduce((s, p) => s + p.x, 0);
-    const sumY = points.reduce((s, p) => s + p.y, 0);
-    const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
-    const sumXX = points.reduce((s, p) => s + p.x * p.x, 0);
-    const sumYY = points.reduce((s, p) => s + p.y * p.y, 0);
+    const n = rawPoints.length;
+    const sumX = rawPoints.reduce((s, p) => s + p.x, 0);
+    const sumY = rawPoints.reduce((s, p) => s + p.y, 0);
+    const sumXY = rawPoints.reduce((s, p) => s + p.x * p.y, 0);
+    const sumXX = rawPoints.reduce((s, p) => s + p.x * p.x, 0);
+    const sumYY = rawPoints.reduce((s, p) => s + p.y * p.y, 0);
 
     const meanX = sumX / n;
     const meanY = sumY / n;
@@ -328,9 +328,58 @@ export default function App() {
     const intercept = meanY - slope * meanX;
     const rSquared = (ssXX === 0 || ssYY === 0) ? 0 : (ssXY * ssXY) / (ssXX * ssYY);
 
+    // Prepare piecewise points (deduplicated and sorted by X)
+    const pointsMapX = new Map<number, { sumY: number, count: number }>();
+    const pointsMapY = new Map<number, { sumX: number, count: number }>();
+    for(const p of rawPoints) {
+       if(!pointsMapX.has(p.x)) pointsMapX.set(p.x, {sumY: 0, count: 0});
+       const entryX = pointsMapX.get(p.x)!;
+       entryX.sumY += p.y;
+       entryX.count++;
+       
+       if(!pointsMapY.has(p.y)) pointsMapY.set(p.y, {sumX: 0, count: 0});
+       const entryY = pointsMapY.get(p.y)!;
+       entryY.sumX += p.x;
+       entryY.count++;
+    }
+    const piecewisePointsX = Array.from(pointsMapX.entries())
+      .map(([x, {sumY, count}]) => ({ x, y: sumY / count }))
+      .sort((a, b) => a.x - b.x);
+    const piecewisePointsY = Array.from(pointsMapY.entries())
+      .map(([y, {sumX, count}]) => ({ y, x: sumX / count }))
+      .sort((a, b) => a.y - b.y);
+
+    const convertLinear = (val: number, points: {a: number, b: number}[]) => {
+      if (points.length < 2) return val;
+      if (val <= points[0].a) {
+         const p1 = points[0];
+         const p2 = points[1];
+         const m = (p2.b - p1.b) / (p2.a - p1.a || 1);
+         return p1.b + m * (val - p1.a);
+      }
+      if (val >= points[points.length - 1].a) {
+         const p1 = points[points.length - 2];
+         const p2 = points[points.length - 1];
+         const m = (p2.b - p1.b) / (p2.a - p1.a || 1);
+         return p2.b + m * (val - p2.a);
+      }
+      for (let i = 0; i < points.length - 1; i++) {
+         const p1 = points[i];
+         const p2 = points[i+1];
+         if (val >= p1.a && val <= p2.a) {
+            const m = (p2.b - p1.b) / (p2.a - p1.a || 1);
+            return p1.b + m * (val - p1.a);
+         }
+      }
+      return val;
+    };
+
+    const convertRefToDev = (x: number) => convertLinear(x, piecewisePointsX.map(p => ({a: p.x, b: p.y})));
+    const convertDevToRef = (y: number) => convertLinear(y, piecewisePointsY.map(p => ({a: p.y, b: p.x})));
+
     // Prepare line points for plotting the trendline
-    const minX = Math.min(...points.map(p => p.x));
-    const maxX = Math.max(...points.map(p => p.x));
+    const minX = Math.min(...rawPoints.map(p => p.x));
+    const maxX = Math.max(...rawPoints.map(p => p.x));
     
     // Add margin
     const marginRange = Math.max(10, (maxX - minX) * 0.1);
@@ -342,7 +391,7 @@ export default function App() {
       y: p.x * slope + intercept
     }));
 
-    return { slope, intercept, rSquared, points, trendlinePoints };
+    return { slope, intercept, rSquared, points: rawPoints, trendlinePoints, convertRefToDev, convertDevToRef };
   };
 
   const trendData = useMemo(() => {
@@ -379,9 +428,9 @@ export default function App() {
           let endLux = endLuxAgrineb;
           
           if (agrinebToOmniTrend && agrinebToOmniTrend.points.length > 1) {
-              startLux = (startLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+              startLux = agrinebToOmniTrend.convertRefToDev(startLuxAgrineb);
               if (!isLastWindow) {
-                  endLux = (endLuxAgrineb * agrinebToOmniTrend.slope) + agrinebToOmniTrend.intercept;
+                  endLux = agrinebToOmniTrend.convertRefToDev(endLuxAgrineb);
               }
           }
 
@@ -1037,8 +1086,8 @@ export default function App() {
                           <div className={cn("text-3xl font-mono font-semibold", calcInput && !isNaN(parseFloat(calcInput)) ? "text-indigo-700" : "text-slate-300")}>
                             {calcInput && !isNaN(parseFloat(calcInput)) ? (
                               calcDirection === 'toRef' 
-                                ? formatLux((parseFloat(calcInput) - trendData.intercept) / trendData.slope)
-                                : formatLux((parseFloat(calcInput) * trendData.slope) + trendData.intercept)
+                                ? formatLux(trendData.convertDevToRef(parseFloat(calcInput)))
+                                : formatLux(trendData.convertRefToDev(parseFloat(calcInput)))
                             ) : '0'} <span className="text-lg text-slate-400 font-sans">Lux</span>
                           </div>
                         </div>
