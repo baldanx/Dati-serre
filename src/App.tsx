@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend
+  Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, Legend, ReferenceLine
 } from 'recharts';
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff, Download, Upload, Copy } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Save, TrendingUp, History, LayoutDashboard, Calculator, Trash2, ArrowRightLeft, Eye, EyeOff, Download, Upload, Copy, Sun, Cloud, Edit2 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -69,6 +69,7 @@ interface DeviceState {
 interface Reading {
   id: string;
   timestamp: number;
+  weather?: 'sunny' | 'cloudy';
   data: Record<DeviceId, {
     rawValue: string;
     totalLux: number;
@@ -100,6 +101,7 @@ export default function App() {
 
   const [calcInput, setCalcInput] = useState<string>('');
   const [calcDirection, setCalcDirection] = useState<'toRef' | 'toDev'>('toRef');
+  const [currentWeather, setCurrentWeather] = useState<'sunny' | 'cloudy'>('sunny');
 
   const [deviceStates, setDeviceStates] = useState<Record<DeviceId, DeviceState>>(() => {
     try {
@@ -221,6 +223,7 @@ export default function App() {
     const newReading: Reading = {
       id: Math.random().toString(36).substring(2, 9),
       timestamp: Date.now(),
+      weather: currentWeather,
       data: computedCurrentData.reduce((acc, curr) => {
         acc[curr.id] = {
           rawValue: curr.state.rawValue,
@@ -300,8 +303,9 @@ export default function App() {
   });
 
   // --- ANALYSIS LOGIC ---
-  const analyzeTrend = (devId: DeviceId, refId: DeviceId) => {
+  const analyzeTrend = (devId: DeviceId, refId: DeviceId, weather: 'sunny' | 'cloudy' | 'all' = 'all') => {
     const rawPoints = readings
+      .filter(r => weather === 'all' || r.weather === weather || (weather === 'sunny' && !r.weather))
       .map(r => ({
         x: r.data[refId].totalLux, // reference x
         y: r.data[devId].totalLux  // device y
@@ -396,7 +400,17 @@ export default function App() {
 
   const trendData = useMemo(() => {
     if (analysisDevice === referenceSource) return null;
-    return analyzeTrend(analysisDevice, referenceSource);
+    return analyzeTrend(analysisDevice, referenceSource, 'all');
+  }, [readings, analysisDevice, referenceSource]);
+
+  const trendDataSunny = useMemo(() => {
+    if (analysisDevice === referenceSource) return null;
+    return analyzeTrend(analysisDevice, referenceSource, 'sunny');
+  }, [readings, analysisDevice, referenceSource]);
+
+  const trendDataCloudy = useMemo(() => {
+    if (analysisDevice === referenceSource) return null;
+    return analyzeTrend(analysisDevice, referenceSource, 'cloudy');
   }, [readings, analysisDevice, referenceSource]);
 
   const computedConverter = useMemo(() => {
@@ -614,13 +628,31 @@ export default function App() {
                   );
                 })}
 
-                <button
-                  onClick={recordReading}
-                  className="w-full mt-4 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-sm active:scale-[0.98]"
-                >
-                  <Save className="w-4 h-4" />
-                  Registra Lettura
-                </button>
+                <div className="mt-6 space-y-3">
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setCurrentWeather('sunny')}
+                      className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all", currentWeather === 'sunny' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                    >
+                      <Sun className="w-4 h-4" />
+                      Soleggiato
+                    </button>
+                    <button
+                      onClick={() => setCurrentWeather('cloudy')}
+                      className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all", currentWeather === 'cloudy' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                    >
+                      <Cloud className="w-4 h-4" />
+                      Nuvoloso
+                    </button>
+                  </div>
+                  <button
+                    onClick={recordReading}
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-sm active:scale-[0.98]"
+                  >
+                    <Save className="w-4 h-4" />
+                    Registra Lettura
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -810,6 +842,9 @@ export default function App() {
                             axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }}
                             tickFormatter={(val) => new Intl.NumberFormat('it-IT', { notation: "compact" }).format(val)}
                           />
+                          {readings.filter(r => r.weather === 'cloudy').map(r => (
+                            <ReferenceLine key={r.id} x={r.timestamp} stroke="#94a3b8" strokeOpacity={0.15} strokeWidth={30} />
+                          ))}
                           <RechartsTooltip
                             labelFormatter={(label) => new Date(label).toLocaleTimeString()}
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -852,8 +887,15 @@ export default function App() {
                       <tbody className="divide-y divide-slate-50">
                         {readings.slice().reverse().map((r) => (
                           <tr key={r.id} className="transition-colors hover:bg-slate-50/50 group">
-                            <td className="px-6 py-3 font-medium text-slate-700">
-                              {new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            <td className="px-6 py-3 font-medium text-slate-700 flex items-center gap-2">
+                              <span>{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                              <button
+                                onClick={() => setReadings(prev => prev.map(reading => reading.id === r.id ? { ...reading, weather: reading.weather === 'cloudy' ? 'sunny' : 'cloudy' } : reading))}
+                                className={cn("p-1 rounded-md transition-colors", r.weather === 'cloudy' ? "text-slate-500 hover:bg-slate-200" : "text-amber-500 hover:bg-amber-100")}
+                                title={r.weather === 'cloudy' ? 'Passa a Soleggiato' : 'Passa a Nuvoloso'}
+                              >
+                                {r.weather === 'cloudy' ? <Cloud className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                              </button>
                             </td>
                             {DEVICES.filter(d => deviceStates[d.id].isActive !== false).map(d => {
                               const val = r.data[d.id]?.totalLux;
@@ -972,7 +1014,7 @@ export default function App() {
                         </div>
 
                         <div className="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-lg text-sm text-indigo-900 leading-relaxed">
-                          <strong>Diagnosi: </strong>
+                          <strong>Diagnosi Globale: </strong>
                           {trendData.rSquared < 0.8 ? (
                             "Le letture hanno una deviazione molto variabile e imprevedibile rispetto al riferimento."
                           ) : Math.abs(trendData.slope - 1) < 0.05 ? (
@@ -980,9 +1022,20 @@ export default function App() {
                           ) : (
                             `L'errore è proporzionale. Il sensore legge mediamente il ${Math.round(trendData.slope * 100)}% del riferimento reale, con un offset di ${Math.round(trendData.intercept)} Lux.`
                           )}
-                          <br/><br/>
-                          <strong>Calcolo Correzione Reale:</strong><br/>
-                          <span className="font-mono text-indigo-700">Valore Reale ≈ (Sensore - {Math.round(trendData.intercept)}) / {trendData.slope.toFixed(2)}</span>
+                          
+                          {trendDataSunny && trendDataCloudy && (
+                            <div className="mt-4 pt-4 border-t border-indigo-200/50">
+                              <h5 className="font-semibold mb-2 flex items-center gap-2"><Sun className="w-4 h-4"/>vs<Cloud className="w-4 h-4"/> Condizioni Meteo</h5>
+                              <p className="mb-2">
+                                Moltiplicatore Sole: <strong className="font-mono">{trendDataSunny.slope.toFixed(2)}x</strong>
+                                <span className="mx-2 text-indigo-300">|</span>
+                                Moltiplicatore Nuvole: <strong className="font-mono">{trendDataCloudy.slope.toFixed(2)}x</strong>
+                              </p>
+                              <p className="text-xs opacity-90">
+                                Una differenza elevata tra questi valori indica che l'angolo di incidenza o il tipo di nuvolosità altera pesantemente la curva del sensore analizzato rispetto al riferimento.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1031,11 +1084,20 @@ export default function App() {
                             />
 
                             {/* Scatter Points */}
-                            <Scatter 
-                              name="Letture" 
-                              data={trendData.points} 
-                              fill={DEVICES.find(d => d.id === analysisDevice)?.color || '#3b82f6'} 
-                            />
+                            {trendDataSunny && trendDataSunny.points.length > 0 && (
+                              <Scatter 
+                                name="Sole" 
+                                data={trendDataSunny.points} 
+                                fill="#f59e0b" // amber-500
+                              />
+                            )}
+                            {trendDataCloudy && trendDataCloudy.points.length > 0 && (
+                              <Scatter 
+                                name="Nuvole" 
+                                data={trendDataCloudy.points} 
+                                fill="#94a3b8" // slate-400
+                              />
+                            )}
                           </ScatterChart>
                         </ResponsiveContainer>
                       </div>
