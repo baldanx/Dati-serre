@@ -73,6 +73,7 @@ export default function App() {
   const [calcInput, setCalcInput] = useState<string>('');
   const [calcDirection, setCalcDirection] = useState<'toRef' | 'toDev'>('toRef');
   const [currentWeather, setCurrentWeather] = useState<'sunny' | 'cloudy'>('sunny');
+  const [weatherBandStep, setWeatherBandStep] = useState<number>(20000);
 
   const [deviceStates, setDeviceStates] = useState<Record<DeviceId, DeviceState>>(() => {
     try {
@@ -371,14 +372,20 @@ export default function App() {
   const weatherBuckets = useMemo(() => {
     if (analysisDevice === referenceSource) return null;
 
-    const bucketsDef = [
-      { min: 0, max: 20000, label: '0-20k Lux' },
-      { min: 20000, max: 40000, label: '20k-40k Lux' },
-      { min: 40000, max: 60000, label: '40k-60k Lux' },
-      { min: 60000, max: 80000, label: '60k-80k Lux' },
-      { min: 80000, max: 100000, label: '80k-100k Lux' },
-      { min: 100000, max: Infinity, label: '>100k Lux' }
-    ];
+    const maxRange = 100000;
+    const bandsCount = Math.ceil(maxRange / weatherBandStep);
+    
+    const bucketsDef = Array.from({ length: bandsCount }).map((_, i) => {
+      const min = i * weatherBandStep;
+      const max = (i + 1) * weatherBandStep;
+      const fmtMin = min >= 1000 ? `${(min / 1000).toFixed(0)}k` : min.toString();
+      const fmtMax = max >= 1000 ? `${(max / 1000).toFixed(0)}k` : max.toString();
+      return {
+        min,
+        max: i === bandsCount - 1 ? Infinity : max,
+        label: i === bandsCount - 1 ? `>${fmtMin} Lux` : `${fmtMin}-${fmtMax} Lux`
+      };
+    });
 
     const results = bucketsDef.map(b => {
       const readingsInBin = readings.filter(r => {
@@ -403,7 +410,7 @@ export default function App() {
     }).filter(b => b.countSunny > 0 || b.countCloudy > 0);
 
     return results;
-  }, [readings, analysisDevice, referenceSource]);
+  }, [readings, analysisDevice, referenceSource, weatherBandStep]);
 
   const computedConverter = useMemo(() => {
     const p2 = parseFloat(agriConfig.p2) || 0;
@@ -845,7 +852,7 @@ export default function App() {
                         {readings.slice().reverse().map((r) => (
                           <tr key={r.id} className="transition-colors hover:bg-slate-50/50 group">
                             <td className="px-6 py-3 font-medium text-slate-700 flex items-center gap-2">
-                              <span>{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                              <span>{new Date(r.timestamp).toLocaleDateString()} {new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                               <button
                                 onClick={() => setReadings(prev => prev.map(reading => reading.id === r.id ? { ...reading, weather: reading.weather === 'cloudy' ? 'sunny' : 'cloudy' } : reading))}
                                 className={cn("p-1 rounded-md transition-colors", r.weather === 'cloudy' ? "text-slate-500 hover:bg-slate-200" : "text-amber-500 hover:bg-amber-100")}
@@ -982,7 +989,24 @@ export default function App() {
                           
                           {weatherBuckets && weatherBuckets.length > 0 && (
                             <div className="mt-4 pt-4 border-t border-indigo-200/50">
-                              <h5 className="font-semibold mb-3 flex items-center gap-2"><Sun className="w-4 h-4 text-amber-500"/>vs<Cloud className="w-4 h-4 text-slate-400"/> Scarto Sensore-Riferimento per Fascia</h5>
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="font-semibold flex items-center gap-2"><Sun className="w-4 h-4 text-amber-500"/>vs<Cloud className="w-4 h-4 text-slate-400"/> Scarto Sensore-Riferimento per Fascia</h5>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor="bands-count" className="text-xs font-medium text-slate-500">Ampiezza Fascia (Lux)</label>
+                                  <select 
+                                    id="bands-count"
+                                    value={weatherBandStep}
+                                    onChange={(e) => setWeatherBandStep(parseInt(e.target.value))}
+                                    className="w-24 bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none"
+                                  >
+                                    <option value="5000">5.000</option>
+                                    <option value="10000">10.000</option>
+                                    <option value="20000">20.000</option>
+                                    <option value="25000">25.000</option>
+                                    <option value="50000">50.000</option>
+                                  </select>
+                                </div>
+                              </div>
                               <div className="overflow-x-auto">
                                 <table className="w-full text-xs text-left">
                                   <thead className="text-slate-500 border-b border-indigo-200/50">
