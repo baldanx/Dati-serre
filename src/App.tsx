@@ -63,9 +63,8 @@ const DateExtensionTick = (props: any) => {
   const { x, y, payload } = props;
   return (
     <g transform={`translate(${x},${y})`}>
-      <path d="M 0 0 L 0 8 L 1000 8" stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth="1" fill="none" />
-      <path d="M 0 0 L 0 8 L 8 8" stroke="#cbd5e1" strokeWidth="1.5" fill="none" />
-      <text x={12} y={12} textAnchor="start" fill="#64748b" className="text-[11px] font-semibold">
+      <path d="M 0 0 L 0 10 L 6 10" stroke="#cbd5e1" strokeWidth="1.5" fill="none" />
+      <text x={10} y={14} textAnchor="start" fill="#64748b" className="text-[11px] font-semibold">
         {payload.value}
       </text>
     </g>
@@ -221,10 +220,31 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportReadings = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(readings));
+    let csvStr = "id,timestamp,date,time,weather,agrineb_input,agrineb_lux,omnigreen_input,omnigreen_lux\n";
+    readings.forEach(r => {
+      const date = new Date(r.timestamp);
+      const row = [
+        r.id,
+        r.timestamp,
+        date.toLocaleDateString('it-IT'),
+        date.toLocaleTimeString('it-IT'),
+        r.weather || 'sunny',
+        r.data.agrineb?.rawValue || '',
+        r.data.agrineb?.totalLux || 0,
+        r.data.omnigreen?.rawValue || '',
+        r.data.omnigreen?.totalLux || 0
+      ].join(',');
+      csvStr += row + "\n";
+    });
+    
+    // Also provide a JSON backup string for complete structure fidelity
+    const jsonStr = JSON.stringify(readings);
+    
+    // Create an object with both representations, but let's just make it a CSV for Excel friendliness
+    const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvStr);
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `lux_readings_export_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchorNode.setAttribute("download", `lux_readings_export_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(downloadAnchorNode); 
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -234,23 +254,61 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+      
       reader.onload = (e) => {
+        const text = e.target?.result as string;
         try {
-          const json = JSON.parse(e.target?.result as string);
-          if (Array.isArray(json)) {
-            // Uniamo le letture, evitando duplicati per ID
+          let importedReadings: Reading[] = [];
+          
+          if (isCsv) {
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            if (lines.length > 1) { // Skip header
+              importedReadings = lines.slice(1).map(line => {
+                const cols = line.split(',');
+                return {
+                  id: cols[0],
+                  timestamp: parseInt(cols[1], 10),
+                  weather: (cols[4] === 'cloudy' ? 'cloudy' : 'sunny') as 'sunny'|'cloudy',
+                  data: {
+                    agrineb: {
+                      rawValue: cols[5],
+                      totalLux: parseFloat(cols[6]) || 0
+                    },
+                    omnigreen: {
+                      rawValue: cols[7],
+                      totalLux: parseFloat(cols[8]) || 0
+                    }
+                  }
+                };
+              });
+            }
+          } else {
+            const json = JSON.parse(text);
+            if (Array.isArray(json)) {
+              importedReadings = json.map(r => ({
+                id: r.id,
+                timestamp: r.timestamp,
+                weather: r.weather || 'sunny',
+                data: r.data
+              }));
+            } else {
+              alert('Formato file non valido. Deve essere un array di letture JSON.');
+              return;
+            }
+          }
+          
+          if (importedReadings.length > 0) {
             setReadings((prev) => {
               const existingIds = new Set(prev.map(r => r.id));
-              const newReadings = json.filter(r => r.id && !existingIds.has(r.id));
+              const newReadings = importedReadings.filter(r => r.id && !existingIds.has(r.id));
               return [...prev, ...newReadings].sort((a, b) => a.timestamp - b.timestamp);
             });
-            alert(`Importate ${json.length} letture con successo.`);
-          } else {
-            alert('Formato file non valido. Deve essere un array di letture JSON.');
+            alert(`Importate ${importedReadings.length} letture con successo.`);
           }
         } catch (err) {
-          console.error("Invalid JSON file", err);
-          alert("Errore durante l'importazione del file JSON.");
+          console.error("Invalid file", err);
+          alert("Errore durante l'importazione del file.");
         }
       };
       reader.readAsText(file);
@@ -768,7 +826,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <input 
                         type="file" 
-                        accept=".json" 
+                        accept=".json,.csv" 
                         ref={fileInputRef} 
                         onChange={handleImportFiles} 
                         className="hidden" 
