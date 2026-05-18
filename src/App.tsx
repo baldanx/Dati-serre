@@ -299,12 +299,8 @@ export default function App() {
           }
           
           if (importedReadings.length > 0) {
-            setReadings((prev) => {
-              const existingIds = new Set(prev.map(r => r.id));
-              const newReadings = importedReadings.filter(r => r.id && !existingIds.has(r.id));
-              return [...prev, ...newReadings].sort((a, b) => a.timestamp - b.timestamp);
-            });
-            alert(`Importate ${importedReadings.length} letture con successo.`);
+            setReadings(importedReadings.sort((a, b) => a.timestamp - b.timestamp));
+            alert(`Importate ${importedReadings.length} letture con successo. I dati precedenti sono stati sovrascritti.`);
           }
         } catch (err) {
           console.error("Invalid file", err);
