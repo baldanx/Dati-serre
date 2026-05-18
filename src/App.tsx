@@ -59,6 +59,19 @@ interface AgricontrolConfig {
   limiteSommaSoglia?: string;
 }
 
+const DateExtensionTick = (props: any) => {
+  const { x, y, payload } = props;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <path d="M 0 0 L 0 8 L 1000 8" stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth="1" fill="none" />
+      <path d="M 0 0 L 0 8 L 8 8" stroke="#cbd5e1" strokeWidth="1.5" fill="none" />
+      <text x={12} y={12} textAnchor="start" fill="#64748b" className="text-[11px] font-semibold">
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
 export default function App() {
   const [agriConfig, setAgriConfig] = useState<AgricontrolConfig>(() => {
     try {
@@ -795,12 +808,23 @@ export default function App() {
                   ) : (
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={readings} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <LineChart data={readings.map(r => ({ ...r, dateString: new Date(r.timestamp).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) }))} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                           <XAxis 
+                            xAxisId={0}
                             dataKey="timestamp" 
                             tickFormatter={(val) => new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10}
+                            axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dy={10}
+                          />
+                          <XAxis 
+                            xAxisId={1}
+                            dataKey="dateString" 
+                            allowDuplicatedCategory={false}
+                            orientation="bottom"
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={<DateExtensionTick />} 
+                            dy={20}
                           />
                           <YAxis 
                             axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }}
